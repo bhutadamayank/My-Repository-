@@ -1,0 +1,9 @@
+# Sentinel lymph node biopsy (SLNB) in early oral cancer — landmark trials
+# Run on the institution's network:  paperfetch batch reading-lists/slnb-oral-cancer.txt
+
+# SENT — Schilling et al., Eur J Cancer 2015;51(18):2777-84 (EORTC 24021, 415 pts, observational)
+10.1016/j.ejca.2015.08.023
+# Garrel et al., J Clin Oncol 2020;38(34):4010-18 (French phase III equivalence RCT, SNB vs ND, 307 pts)
+10.1200/JCO.20.01661
+# Hasegawa et al., J Clin Oncol 2021;39(18):2025-36 (Japanese phase III non-inferiority RCT, 271 pts)
+10.1200/JCO.20.03637

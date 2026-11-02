@@ -71,6 +71,23 @@ class SourceFinder:
                 out.append(Candidate(url, "unpaywall", "open", loc.get("version")))
         return out
 
+    def hal(self, doi: str) -> list[Candidate]:
+        """HAL, the French national open archive (author deposits of published papers)."""
+        try:
+            r = self.s.get(
+                "https://api.archives-ouvertes.fr/search/",
+                params={"q": f'doiId_s:"{doi}"', "fl": "fileMain_s,files_s"},
+                headers=api_headers(self.cfg),
+                timeout=self.cfg.timeout,
+            )
+            if r.status_code != 200:
+                return []
+            docs = r.json().get("response", {}).get("docs", [])
+        except (requests.RequestException, ValueError):
+            return []
+        urls = [d["fileMain_s"] for d in docs if d.get("fileMain_s")]  # "notice" records have no file
+        return [Candidate(u, "hal", "open") for u in urls]
+
     def semantic_scholar(self, art: Article) -> list[Candidate]:
         key = f"DOI:{art.doi}" if art.doi else (f"ARXIV:{art.arxiv_id}" if art.arxiv_id else None)
         if not key:
@@ -108,6 +125,7 @@ class SourceFinder:
                 cands.append(Candidate(f"https://arxiv.org/pdf/{art.arxiv_id}", "arxiv", "open", "submittedVersion"))
             if art.doi:
                 cands += self.unpaywall(art.doi)
+                cands += self.hal(art.doi)
             cands += self.semantic_scholar(art)
             for loc in art.locations:  # OA landing pages without a direct PDF link
                 if loc.is_oa and not loc.pdf_url and loc.landing_url:

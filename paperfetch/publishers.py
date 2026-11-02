@@ -200,3 +200,23 @@ def doi_prefix_urls(doi: str) -> list[str]:
 def looks_like_bot_wall(html: str) -> bool:
     h = html[:20000].lower()
     return any(s in h for s in ("just a moment...", "cf-challenge", "challenge-platform", "are you a robot", "captcha"))
+
+
+FIGSHARE_PATH_RE = re.compile(r"^/articles/[^/]+/[^/]+/(\d+)(?:/\d+)?/?$")
+
+
+def figshare_article_id(url: str) -> str | None:
+    """Figshare and the many university repositories built on it (outputs.<uni>.ac.uk, ...)."""
+    parts = urlsplit(url)
+    m = FIGSHARE_PATH_RE.match(parts.path)
+    if m and ("figshare" in parts.netloc or parts.netloc.count(".") >= 2):
+        return m.group(1)
+    return None
+
+
+def figshare_pdf_urls(api_json: dict) -> list[str]:
+    return [
+        f["download_url"]
+        for f in api_json.get("files", [])
+        if f.get("download_url") and not f.get("is_link_only") and f.get("name", "").lower().endswith(".pdf")
+    ]

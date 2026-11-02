@@ -14,7 +14,8 @@ import requests
 
 from .config import Config
 from .metadata import Article
-from .publishers import extract_pdf_links, looks_like_bot_wall
+from .http import api_headers
+from .publishers import extract_pdf_links, figshare_article_id, figshare_pdf_urls, looks_like_bot_wall
 from .sources import Candidate
 
 MAX_PDF_BYTES = 250 * 1024 * 1024
@@ -91,7 +92,10 @@ class Downloader:
             status = r.status_code
             text = body.decode(r.encoding or "utf-8", errors="replace")
 
-        if looks_like_bot_wall(text):
+        fid = figshare_article_id(final_url)
+        if fid and depth < 2:
+            return self._try_figshare(fid, cand, dest, depth, visited, res)
+        if looks_like_bot_wall(text) or (status == 202 and len(text.strip()) < 2000):
             res.attempts.append((final_url, f"HTTP {status}: blocked by a bot/JavaScript check"))
             res.bot_walls.append(final_url)
             return None
@@ -106,6 +110,24 @@ class Downloader:
         res.attempts.append((final_url, f"HTTP {status}: HTML page, following {min(len(links), 8)} PDF link(s)"))
         for link in links[:8]:
             path = self._try(link, cand, dest, depth + 1, visited, final_url, res)
+            if path:
+                return path
+        return None
+
+    def _try_figshare(self, article_id, cand, dest, depth, visited, res: Result) -> Path | None:
+        """Repositories on Figshare serve files through their public API."""
+        api = f"https://api.figshare.com/v2/articles/{article_id}"
+        try:
+            r = self.s.get(api, headers=api_headers(self.cfg), timeout=self.cfg.timeout)
+            data = r.json() if r.status_code == 200 else {}
+        except (requests.RequestException, ValueError):
+            data = {}
+        urls = figshare_pdf_urls(data)
+        if not urls:
+            res.attempts.append((api, "repository record has no PDF file attached (metadata only)"))
+            return None
+        for u in urls:
+            path = self._try(u, cand, dest, depth + 1, visited, None, res)
             if path:
                 return path
         return None

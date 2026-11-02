@@ -8,7 +8,7 @@ from paperfetch.config import Config
 from paperfetch.downloader import Downloader, Library, safe_filename
 from paperfetch.identifiers import clean_doi, parse
 from paperfetch.metadata import Article, parse_arxiv_feed, parse_crossref, parse_openalex, title_similarity
-from paperfetch.publishers import doi_prefix_urls, extract_pdf_links, looks_like_bot_wall, rewrite_rules
+from paperfetch.publishers import figshare_article_id, figshare_pdf_urls, doi_prefix_urls, extract_pdf_links, looks_like_bot_wall, rewrite_rules
 from paperfetch.sources import Candidate, SourceFinder
 
 
@@ -150,6 +150,7 @@ def test_ranking_and_ezproxy():
 
 
 SourceFinder.semantic_scholar = lambda self, art: []  # keep tests offline
+SourceFinder.hal = lambda self, doi: []
 
 
 # ---------------- downloader with a fake HTTP layer ----------------
@@ -216,3 +217,20 @@ def test_filename_and_library(tmp_path: Path):
     lib.add(art, tmp_path / name, Candidate("u", "s", "open"))
     assert lib.find(Article(doi="10.1/x")) == tmp_path / name
     assert lib.find(Article(doi="10.1/other")) is None
+
+
+def test_figshare():
+    url = "https://outputs.ncl.ac.uk/articles/journal_contribution/Some_title/34272276/1"
+    assert figshare_article_id(url) == "34272276"
+    assert figshare_article_id("https://figshare.com/articles/dataset/x/152356") == "152356"
+    assert figshare_article_id("https://www.nature.com/articles/nature14539") is None
+    data = {"files": [{"name": "paper.PDF", "download_url": "https://ndownloader.figshare.com/files/1"},
+                      {"name": "data.csv", "download_url": "https://ndownloader.figshare.com/files/2"}]}
+    assert figshare_pdf_urls(data) == ["https://ndownloader.figshare.com/files/1"]
+    assert figshare_pdf_urls({"files": []}) == []
+
+
+def test_empty_202_is_reported_as_challenge(tmp_path: Path):
+    s = FakeSession({"https://repo.example.org/item/9": FakeResp("https://repo.example.org/item/9", 202, b"")})
+    res = Downloader(s, Config()).fetch([Candidate("https://repo.example.org/item/9", "x", "open")], tmp_path / "x.pdf")
+    assert res.path is None and res.bot_walls
